@@ -291,13 +291,13 @@
 
       <button class="action-btn secondary-btn" id="record-btn" style="width: 100%;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg>
-        錄製影片 (每 3 秒自動換行)
+        錄製影片 (全文字播放完畢自動存檔)
       </button>
 
       <div class="hint">
         • 點擊針群精確點發起漣漪擴散並換行。<br>
         • 高金屬度 PBR 反射，極致金屬光澤。<br>
-        • 柱體平緩流暢升降，廣角亮麗照明。
+        • 自動錄製完整輪播過程並自動下載存檔。
       </div>
     </div>
   </div>
@@ -384,7 +384,6 @@
       const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
       scene.add(ambientLight);
 
-      // 加大陰影投影範圍（shadowD = 65）確保全陣列亮麗無暗角
       const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
       mainLight.position.set(40, 70, 40);
       mainLight.castShadow = true;
@@ -399,7 +398,6 @@
       mainLight.shadow.camera.bottom = -shadowD;
       scene.add(mainLight);
 
-      // 多角度高光金屬感補光
       const specLight = new THREE.DirectionalLight(0xe2e8f0, 1.3);
       specLight.position.set(-60, 50, 50);
       scene.add(specLight);
@@ -416,7 +414,6 @@
       rimLight.position.set(0, 40, -50);
       scene.add(rimLight);
 
-      // 亮度調節拉桿
       const brightnessSlider = document.getElementById('brightness-slider');
       if (brightnessSlider) {
         brightnessSlider.addEventListener('input', (e) => {
@@ -427,7 +424,7 @@
         });
       }
 
-      // --- 離屏 2D Canvas (4x2 佈局點陣渲染) ---
+      // --- 離屏 2D Canvas ---
       const textCanvas = document.createElement('canvas');
       const textCtx = textCanvas.getContext('2d');
       textCanvas.width = GRID_COLS;
@@ -469,7 +466,7 @@
         }
       }
 
-      // --- 金屬針 InstancedMesh (高光金屬 PBR 材質) ---
+      // --- 金屬針 InstancedMesh ---
       const totalPins = GRID_COLS * GRID_ROWS;
       const pinGeometry = new THREE.BoxGeometry(PIN_WIDTH, 1, PIN_WIDTH);
       pinGeometry.translate(0, 0.5, 0);
@@ -620,7 +617,6 @@
           const x = pinPositions[i * 2];
           const z = pinPositions[i * 2 + 1];
 
-          // 1. 大海嘯邏輯
           if (isTsunamiActive) {
             const waveX = (tsunamiElapsed * TSUNAMI_SPEED) - (GRID_COLS * PIN_SPACING / 2);
             const currentPos = tsunamiDirection === 1 ? x : -x;
@@ -638,7 +634,6 @@
             }
           }
 
-          // 2. 觸碰點擴散漣漪邏輯
           if (isWaveActive) {
             const dist = Math.hypot(x - waveCenter.x, z - waveCenter.y);
             const waveFront = waveElapsed * WAVE_SPEED;
@@ -655,7 +650,6 @@
             }
           }
 
-          // 平緩漸變 Lerp (0.05 配合漣漪擴散速度)
           currentHeights[i] += (targetHeights[i] - currentHeights[i]) * 0.05;
 
           const isText = textMask[i] === 1;
@@ -702,14 +696,39 @@
         }
       }
 
-      // --- 錄影功能 ---
+      // --- 自動結束與存檔錄影功能 ---
       let mediaRecorder = null;
       let recordedChunks = [];
       let isRecording = false;
+      let recordCountdownTimer = null;
+
+      function stopAndSaveRecording() {
+        if (!isRecording) return;
+
+        if (autoPlayTimer) clearInterval(autoPlayTimer);
+        if (recordCountdownTimer) clearInterval(recordCountdownTimer);
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        isRecording = false;
+
+        const recordBtn = document.getElementById('record-btn');
+        if (recordBtn) {
+          recordBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+          recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (全文字播放完畢自動存檔)`;
+        }
+      }
 
       function toggleRecording() {
         const recordBtn = document.getElementById('record-btn');
         if (!isRecording) {
+          parseInputText();
+          const totalLineCount = lines.length;
+          // 每行切換間隔 3 秒，計算完整的總展演秒數
+          const durationPerLine = 3.0;
+          const totalDurationSec = totalLineCount * durationPerLine;
+
           const stream = renderer.domElement.captureStream(30);
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
 
@@ -726,30 +745,44 @@
             a.download = `wave_pin_art_${Date.now()}.webm`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast("影片下載完成！");
+            showToast("錄影已自動結束並完成下載！");
           };
 
           mediaRecorder.start();
           isRecording = true;
 
+          currentLineIdx = lines.length - 1; // 從第一行開始
           triggerNextLineWave(0, 0);
-          autoPlayTimer = setInterval(() => {
-            triggerNextLineWave(0, 0);
-          }, 3000);
 
+          let stepCount = 0;
+          autoPlayTimer = setInterval(() => {
+            stepCount++;
+            if (stepCount >= totalLineCount) {
+              // 完整播完一輪，自動結束並存檔
+              stopAndSaveRecording();
+            } else {
+              triggerNextLineWave(0, 0);
+            }
+          }, durationPerLine * 1000);
+
+          let remainingSec = Math.ceil(totalDurationSec);
           if (recordBtn) {
             recordBtn.style.background = '#ef4444';
-            recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"></rect></svg> 停止錄影並儲存`;
+            recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"></rect></svg> 錄影中 (${remainingSec}s 自動存檔)`;
           }
-          showToast("錄影中：每 3 秒自動換行展演...");
+
+          recordCountdownTimer = setInterval(() => {
+            remainingSec--;
+            if (remainingSec <= 0) {
+              clearInterval(recordCountdownTimer);
+            } else if (recordBtn) {
+              recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"></rect></svg> 錄影中 (${remainingSec}s 自動存檔)`;
+            }
+          }, 1000);
+
+          showToast(`錄影開始：預計 ${totalDurationSec.toFixed(0)} 秒後自動結束存檔...`);
         } else {
-          if (autoPlayTimer) clearInterval(autoPlayTimer);
-          mediaRecorder.stop();
-          isRecording = false;
-          if (recordBtn) {
-            recordBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-            recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (每 3 秒自動換行)`;
-          }
+          stopAndSaveRecording();
         }
       }
 
