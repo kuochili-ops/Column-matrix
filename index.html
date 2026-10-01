@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>金屬細柱陣列震波文字</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background-color: #05070a;
+      color: #e0e6ed;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* UI 面板設定 */
+    .ui-panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px;
+      width: 310px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* 收合狀態 */
+    .ui-panel.collapsed {
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 24px;
+      cursor: pointer;
+      background: rgba(13, 17, 23, 0.92);
+    }
+    .ui-panel.collapsed .panel-content {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f1f5f9;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toggle-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .panel-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.2s ease;
+    }
+
+    textarea {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      padding: 10px;
+      border-radius: 8px;
+      outline: none;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 70px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    textarea:focus {
+      border-color: #6366f1;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+    .control-row label {
+      flex-shrink: 0;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    input[type="range"] {
+      flex: 1;
+      height: 4px;
+      accent-color: #6366f1;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    button.action-btn {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      padding: 9px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button.action-btn:hover {
+      background: #6366f1;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+    button.secondary-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    button.secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: none;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px;
+      border-radius: 6px;
+      border-left: 2px solid #6366f1;
+    }
+
+    /* 獨立於畫面下方的大海嘯按鈕 */
+    #tsunami-bottom-btn {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #tsunami-bottom-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+      transform: translateX(-50%) scale(1.05);
+    }
+    #tsunami-bottom-btn:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+
+    #toast {
+      position: absolute;
+      bottom: 75px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(15, 23, 42, 0.9);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-size: 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+      pointer-events: none;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+
+  <!-- 載入 Three.js 核心庫與 OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <!-- 設定控制面板 (預設收合) -->
+  <div class="ui-panel collapsed" id="ui-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        設定選單
+      </div>
+      <button class="toggle-btn" id="toggle-panel-btn" title="展開/收合">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="toggle-icon"><path d="M18 15l-6-6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <div class="panel-content">
+      <textarea id="text-input" placeholder="輸入多行文字... (每行 > 8 字自動 2 秒輪播與搖晃，觸碰造浪)">震波金屬針陣列
+科幻動態視覺呈現
+歡迎體驗專屬訊息特效</textarea>
+
+      <!-- 亮度調節拉桿 -->
+      <div class="control-row">
+        <label for="brightness-slider">畫面亮度</label>
+        <div class="slider-container">
+          <input type="range" id="brightness-slider" min="0.5" max="2.5" step="0.05" value="1.3">
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="action-btn" id="trigger-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          觸發震波
+        </button>
+        <button class="action-btn secondary-btn" id="share-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+          分享網址
+        </button>
+      </div>
+
+      <button class="action-btn secondary-btn" id="record-btn" style="width: 100%;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg>
+        錄製影片 (每 3 秒自動換行)
+      </button>
+
+      <div class="hint">
+        • 點擊針群精確點發起漣漪擴散並換行。<br>
+        • 高金屬度 PBR 反射，極致金屬光澤。<br>
+        • 柱體平緩流暢升降，廣角亮麗照明。
+      </div>
+    </div>
+  </div>
+
+  <!-- 獨立大海嘯按鈕 -->
+  <button id="tsunami-bottom-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path></svg>
+    大海嘯進場
+  </button>
+
+  <div id="toast">訊息已複製到剪貼簿！</div>
+
+  <script>
+    function initApp() {
+      if (typeof THREE === 'undefined') {
+        setTimeout(initApp, 100);
+        return;
+      }
+
+      // --- 規格參數 ---
+      const GRID_COLS = 160;
+      const GRID_ROWS = 80;
+      const PIN_WIDTH = 0.20;
+      const PIN_GAP = 0.03;
+      const PIN_SPACING = PIN_WIDTH + PIN_GAP;
+      
+      const INITIAL_HEIGHT = 4.0;
+      const DROPPED_HEIGHT = 0.5;
+      const BASE_TEXT_RAISED_HEIGHT = 2.2;
+
+      // 狀態變數
+      let lines = [];
+      let currentLineIdx = 0;
+      let currentBatchIdx = 0;
+      let totalBatches = 1;
+      let batchTimer = null;
+      let autoPlayTimer = null;
+      let currentLineCharCount = 0;
+
+      // 海嘯 state
+      let isTsunamiActive = false;
+      let tsunamiStartTime = 0;
+      let tsunamiDirection = 1;
+
+      // 震波 state
+      let isWaveActive = false;
+      let waveStartTime = 0;
+      let waveCenter = new THREE.Vector2(0, 0);
+
+      // Touch / Pointer 判定
+      let pointerDownPos = { x: 0, y: 0 };
+
+      // --- Three.js 初始化 ---
+      const container = document.getElementById('canvas-container');
+      const width = window.innerWidth || 800;
+      const height = window.innerHeight || 600;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x06080d);
+      scene.fog = new THREE.FogExp2(0x06080d, 0.005);
+
+      const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+      camera.position.set(0, 35, 45);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      if (THREE.ACESFilmicToneMapping) renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.3;
+      container.appendChild(renderer.domElement);
+
+      let controls;
+      if (THREE.OrbitControls) {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        controls.target.set(0, 0, 0);
+      }
+
+      // --- 廣角照明系統 ---
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+      scene.add(ambientLight);
+
+      // 加大陰影投影範圍（shadowD = 65）確保全陣列亮麗無暗角
+      const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
+      mainLight.position.set(40, 70, 40);
+      mainLight.castShadow = true;
+      mainLight.shadow.mapSize.width = 2048;
+      mainLight.shadow.mapSize.height = 2048;
+      mainLight.shadow.camera.near = 10;
+      mainLight.shadow.camera.far = 250;
+      const shadowD = 65;
+      mainLight.shadow.camera.left = -shadowD;
+      mainLight.shadow.camera.right = shadowD;
+      mainLight.shadow.camera.top = shadowD;
+      mainLight.shadow.camera.bottom = -shadowD;
+      scene.add(mainLight);
+
+      // 多角度高光金屬感補光
+      const specLight = new THREE.DirectionalLight(0xe2e8f0, 1.3);
+      specLight.position.set(-60, 50, 50);
+      scene.add(specLight);
+
+      const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
+      fillLight.position.set(-50, 40, -40);
+      scene.add(fillLight);
+
+      const frontFill = new THREE.DirectionalLight(0xffffff, 0.8);
+      frontFill.position.set(0, 50, 60);
+      scene.add(frontFill);
+
+      const rimLight = new THREE.PointLight(0x818cf8, 1.2, 150);
+      rimLight.position.set(0, 40, -50);
+      scene.add(rimLight);
+
+      // 亮度調節拉桿
+      const brightnessSlider = document.getElementById('brightness-slider');
+      if (brightnessSlider) {
+        brightnessSlider.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          renderer.toneMappingExposure = val;
+          ambientLight.intensity = 1.4 * (val / 1.3);
+          mainLight.intensity = 1.8 * (val / 1.3);
+        });
+      }
+
+      // --- 離屏 2D Canvas (4x2 佈局點陣渲染) ---
+      const textCanvas = document.createElement('canvas');
+      const textCtx = textCanvas.getContext('2d');
+      textCanvas.width = GRID_COLS;
+      textCanvas.height = GRID_ROWS;
+
+      const textMask = new Uint8Array(GRID_COLS * GRID_ROWS);
+
+      function draw4x2BatchText(str) {
+        textCtx.fillStyle = 'black';
+        textCtx.fillRect(0, 0, GRID_COLS, GRID_ROWS);
+
+        const chars = Array.from(str);
+        if (chars.length === 0) {
+          textMask.fill(0);
+          return;
+        }
+
+        const topRow = chars.slice(0, 4);
+        const bottomRow = chars.slice(4, 8);
+
+        textCtx.fillStyle = 'white';
+        textCtx.textAlign = 'center';
+        textCtx.textBaseline = 'middle';
+        textCtx.font = '900 28px "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif';
+
+        if (bottomRow.length === 0) {
+          const textStr = topRow.join('');
+          textCtx.fillText(textStr, GRID_COLS / 2, GRID_ROWS / 2);
+        } else {
+          const topStr = topRow.join('');
+          const bottomStr = bottomRow.join('');
+          textCtx.fillText(topStr, GRID_COLS / 2, GRID_ROWS / 2 - 14);
+          textCtx.fillText(bottomStr, GRID_COLS / 2, GRID_ROWS / 2 + 16);
+        }
+
+        const imgData = textCtx.getImageData(0, 0, GRID_COLS, GRID_ROWS).data;
+        for (let i = 0; i < GRID_COLS * GRID_ROWS; i++) {
+          textMask[i] = imgData[i * 4] > 100 ? 1 : 0;
+        }
+      }
+
+      // --- 金屬針 InstancedMesh (高光金屬 PBR 材質) ---
+      const totalPins = GRID_COLS * GRID_ROWS;
+      const pinGeometry = new THREE.BoxGeometry(PIN_WIDTH, 1, PIN_WIDTH);
+      pinGeometry.translate(0, 0.5, 0);
+
+      const pinMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        roughness: 0.10,
+        metalness: 0.96,
+      });
+
+      const instancedMesh = new THREE.InstancedMesh(pinGeometry, pinMaterial, totalPins);
+      instancedMesh.castShadow = true;
+      instancedMesh.receiveShadow = true;
+      scene.add(instancedMesh);
+
+      // 底座外框
+      const baseGeo = new THREE.BoxGeometry(GRID_COLS * PIN_SPACING + 0.8, 1.5, GRID_ROWS * PIN_SPACING + 0.8);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5, metalness: 0.6 });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.position.y = -0.75;
+      baseMesh.receiveShadow = true;
+      scene.add(baseMesh);
+
+      // 位置與高度資料結構
+      const currentHeights = new Float32Array(totalPins);
+      const targetHeights = new Float32Array(totalPins);
+      const pinPositions = new Float32Array(totalPins * 2);
+      const staggeredNoise = new Float32Array(totalPins);
+
+      const offsetX = (GRID_COLS * PIN_SPACING) / 2 - PIN_SPACING / 2;
+      const offsetZ = (GRID_ROWS * PIN_SPACING) / 2 - PIN_SPACING / 2;
+
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          const idx = r * GRID_COLS + c;
+          const x = c * PIN_SPACING - offsetX;
+          const z = r * PIN_SPACING - offsetZ;
+          pinPositions[idx * 2] = x;
+          pinPositions[idx * 2 + 1] = z;
+
+          const pseudoRandom = Math.sin(c * 12.9898 + r * 78.233) * 43758.5453;
+          staggeredNoise[idx] = (pseudoRandom - Math.floor(pseudoRandom) - 0.5) * 0.10;
+
+          currentHeights[idx] = INITIAL_HEIGHT;
+          targetHeights[idx] = INITIAL_HEIGHT;
+        }
+      }
+
+      // --- 動畫與切換控制 ---
+      function parseInputText() {
+        const inputEl = document.getElementById('text-input');
+        const rawText = inputEl ? inputEl.value.trim() : '';
+        if (!rawText) {
+          lines = ['細柱針陣列', '震波文字'];
+        } else {
+          lines = rawText.split('\n').filter(l => l.trim().length > 0);
+        }
+      }
+
+      function applyCurrentBatchText() {
+        const currentLineText = lines[currentLineIdx] || '';
+        const chars = Array.from(currentLineText);
+        currentLineCharCount = chars.length;
+
+        totalBatches = Math.max(1, Math.ceil(chars.length / 8));
+
+        const batchChars = chars.slice(currentBatchIdx * 8, (currentBatchIdx + 1) * 8).join('');
+        draw4x2BatchText(batchChars);
+
+        for (let i = 0; i < totalPins; i++) {
+          const isText = textMask[i] === 1;
+          if (isText) {
+            targetHeights[i] = BASE_TEXT_RAISED_HEIGHT + staggeredNoise[i];
+          } else {
+            targetHeights[i] = DROPPED_HEIGHT;
+          }
+        }
+      }
+
+      function startBatchTimer() {
+        if (batchTimer) clearInterval(batchTimer);
+
+        if (currentLineCharCount > 8) {
+          batchTimer = setInterval(() => {
+            currentBatchIdx = (currentBatchIdx + 1) % totalBatches;
+            applyCurrentBatchText();
+          }, 2000);
+        }
+      }
+
+      function triggerTsunami() {
+        if (batchTimer) clearInterval(batchTimer);
+        parseInputText();
+        
+        currentLineIdx = 0;
+        currentBatchIdx = 0;
+
+        const currentLineText = lines[0] || '';
+        const chars = Array.from(currentLineText);
+        currentLineCharCount = chars.length;
+        const batchChars = chars.slice(0, 8).join('');
+        draw4x2BatchText(batchChars);
+
+        for (let i = 0; i < totalPins; i++) {
+          targetHeights[i] = INITIAL_HEIGHT;
+        }
+
+        tsunamiDirection = Math.random() > 0.5 ? 1 : -1;
+        tsunamiStartTime = performance.now();
+        isTsunamiActive = true;
+        isWaveActive = false;
+
+        setTimeout(() => {
+          isTsunamiActive = false;
+          applyCurrentBatchText();
+          startBatchTimer();
+        }, 1200);
+      }
+
+      function triggerNextLineWave(originX = 0, originZ = 0) {
+        if (batchTimer) clearInterval(batchTimer);
+        parseInputText();
+
+        currentLineIdx = (currentLineIdx + 1) % lines.length;
+        currentBatchIdx = 0;
+
+        waveCenter.set(originX, originZ);
+        waveStartTime = performance.now();
+        isWaveActive = true;
+        isTsunamiActive = false;
+
+        applyCurrentBatchText();
+        startBatchTimer();
+      }
+
+      // --- Mesh 矩陣更新 ---
+      const dummy = new THREE.Object3D();
+
+      function updatePins(time) {
+        const timeSec = time * 0.001;
+        const waveElapsed = (time - waveStartTime) / 1000;
+        const tsunamiElapsed = (time - tsunamiStartTime) / 1000;
+
+        const WAVE_SPEED = 24.0;
+        const TSUNAMI_SPEED = 36.0;
+
+        for (let i = 0; i < totalPins; i++) {
+          const x = pinPositions[i * 2];
+          const z = pinPositions[i * 2 + 1];
+
+          // 1. 大海嘯邏輯
+          if (isTsunamiActive) {
+            const waveX = (tsunamiElapsed * TSUNAMI_SPEED) - (GRID_COLS * PIN_SPACING / 2);
+            const currentPos = tsunamiDirection === 1 ? x : -x;
+            
+            if (currentPos < waveX) {
+              const isText = textMask[i] === 1;
+              targetHeights[i] = isText ? (BASE_TEXT_RAISED_HEIGHT + staggeredNoise[i]) : DROPPED_HEIGHT;
+            } else {
+              const distToHead = currentPos - waveX;
+              if (distToHead < 6) {
+                targetHeights[i] = INITIAL_HEIGHT + Math.sin(distToHead) * 2.8;
+              } else {
+                targetHeights[i] = INITIAL_HEIGHT;
+              }
+            }
+          }
+
+          // 2. 觸碰點擴散漣漪邏輯
+          if (isWaveActive) {
+            const dist = Math.hypot(x - waveCenter.x, z - waveCenter.y);
+            const waveFront = waveElapsed * WAVE_SPEED;
+
+            if (dist < waveFront) {
+              const isText = textMask[i] === 1;
+              targetHeights[i] = isText ? (BASE_TEXT_RAISED_HEIGHT + staggeredNoise[i]) : DROPPED_HEIGHT;
+            } else {
+              const waveEdge = dist - waveFront;
+              if (waveEdge < 4) {
+                const waveImpact = Math.sin(waveEdge * Math.PI * 0.5) * 1.5;
+                targetHeights[i] = Math.max(targetHeights[i], currentHeights[i] + waveImpact);
+              }
+            }
+          }
+
+          // 平緩漸變 Lerp (0.05 配合漣漪擴散速度)
+          currentHeights[i] += (targetHeights[i] - currentHeights[i]) * 0.05;
+
+          const isText = textMask[i] === 1;
+          let ripple = 0;
+          
+          if (!isTsunamiActive && currentLineCharCount > 8) {
+            if (isText) {
+              ripple = Math.sin(timeSec * 4.5 + x * 0.6 + z * 0.6) * 0.08;
+            } else {
+              ripple = Math.cos(timeSec * 3.2 + x * 0.4 - z * 0.4) * 0.04;
+            }
+          }
+
+          const finalHeight = Math.max(0.2, currentHeights[i] + ripple);
+
+          dummy.position.set(x, 0, z);
+          dummy.scale.set(1, finalHeight, 1);
+          dummy.updateMatrix();
+
+          instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        instancedMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      // --- URL 分享與解析 ---
+      function encodeTextToURL() {
+        const text = document.getElementById('text-input').value;
+        const encoded = encodeURIComponent(text);
+        const newUrl = `${window.location.origin}${window.location.pathname}?msg=${encoded}`;
+        navigator.clipboard.writeText(newUrl).then(() => {
+          showToast("分享連結已複製到剪貼簿！");
+        }).catch(() => {
+          showToast("複製失敗，請手動複製 URL");
+        });
+      }
+
+      function decodeURLText() {
+        const params = new URLSearchParams(window.location.search);
+        const msg = params.get('msg');
+        if (msg) {
+          const inputEl = document.getElementById('text-input');
+          if (inputEl) inputEl.value = decodeURIComponent(msg);
+        }
+      }
+
+      // --- 錄影功能 ---
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let isRecording = false;
+
+      function toggleRecording() {
+        const recordBtn = document.getElementById('record-btn');
+        if (!isRecording) {
+          const stream = renderer.domElement.captureStream(30);
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+
+          recordedChunks = [];
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wave_pin_art_${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("影片下載完成！");
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+
+          triggerNextLineWave(0, 0);
+          autoPlayTimer = setInterval(() => {
+            triggerNextLineWave(0, 0);
+          }, 3000);
+
+          if (recordBtn) {
+            recordBtn.style.background = '#ef4444';
+            recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"></rect></svg> 停止錄影並儲存`;
+          }
+          showToast("錄影中：每 3 秒自動換行展演...");
+        } else {
+          if (autoPlayTimer) clearInterval(autoPlayTimer);
+          mediaRecorder.stop();
+          isRecording = false;
+          if (recordBtn) {
+            recordBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+            recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (每 3 秒自動換行)`;
+          }
+        }
+      }
+
+      function showToast(msg) {
+        const toast = document.getElementById('toast');
+        if (toast) {
+          toast.innerText = msg;
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 2800);
+        }
+      }
+
+      // --- 事件綁定 ---
+      const panel = document.getElementById('ui-panel');
+      const toggleBtn = document.getElementById('toggle-panel-btn');
+
+      if (toggleBtn && panel) {
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          panel.classList.toggle('collapsed');
+        });
+
+        panel.addEventListener('click', () => {
+          if (panel.classList.contains('collapsed')) {
+            panel.classList.remove('collapsed');
+          }
+        });
+      }
+
+      const triggerBtn = document.getElementById('trigger-btn');
+      if (triggerBtn) triggerBtn.addEventListener('click', () => triggerNextLineWave(0, 0));
+
+      const tsunamiBtn = document.getElementById('tsunami-bottom-btn');
+      if (tsunamiBtn) tsunamiBtn.addEventListener('click', () => triggerTsunami());
+
+      const shareBtn = document.getElementById('share-btn');
+      if (shareBtn) shareBtn.addEventListener('click', encodeTextToURL);
+
+      const recordBtn = document.getElementById('record-btn');
+      if (recordBtn) recordBtn.addEventListener('click', toggleRecording);
+
+      // --- 手指/游標精確觸碰點造浪並換行 ---
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      window.addEventListener('pointerdown', (e) => {
+        pointerDownPos.x = e.clientX;
+        pointerDownPos.y = e.clientY;
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        if (e.target.closest('.ui-panel') || e.target.closest('#tsunami-bottom-btn')) return;
+
+        const distMoved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (distMoved > 6) return;
+
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(instancedMesh);
+
+        if (intersects.length > 0) {
+          const hitPoint = intersects[0].point;
+          triggerNextLineWave(hitPoint.x, hitPoint.z);
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        const newW = window.innerWidth;
+        const newH = window.innerHeight;
+        camera.aspect = newW / newH;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newW, newH);
+      });
+
+      // --- 啟動初始化 ---
+      decodeURLText();
+      parseInputText();
+
+      setTimeout(() => {
+        triggerTsunami();
+      }, 300);
+
+      function animate(time) {
+        requestAnimationFrame(animate);
+        if (controls) controls.update();
+        updatePins(time);
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
