@@ -291,20 +291,20 @@
 
       <button class="action-btn secondary-btn" id="record-btn" style="width: 100%;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg>
-        錄製影片 (全文字播放完畢自動存檔)
+        錄製影片 (海嘯開場 + 全文字自動存檔)
       </button>
 
       <div class="hint">
+        • 開始錄影會先觸發大海嘯進場。<br>
         • 點擊針群精確點發起漣漪擴散並換行。<br>
-        • 高金屬度 PBR 反射，極致金屬光澤。<br>
-        • 自動錄製完整輪播過程並自動下載存檔。
+        • 全流程展演完畢自動結束錄影並下載。
       </div>
     </div>
   </div>
 
   <!-- 獨立大海嘯按鈕 -->
   <button id="tsunami-bottom-btn">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path></svg>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path></svg>
     大海嘯進場
   </button>
 
@@ -325,8 +325,8 @@
       const PIN_SPACING = PIN_WIDTH + PIN_GAP;
       
       const INITIAL_HEIGHT = 4.0;
-      const DROPPED_HEIGHT = 0.5;
-      const BASE_TEXT_RAISED_HEIGHT = 2.2;
+      const DROPPED_HEIGHT = 0.1;
+      const BASE_TEXT_RAISED_HEIGHT = 2.8;
 
       // 狀態變數
       let lines = [];
@@ -380,12 +380,12 @@
         controls.target.set(0, 0, 0);
       }
 
-      // --- 廣角照明系統 ---
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+      // --- 光源系統 ---
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
       scene.add(ambientLight);
 
-      const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
-      mainLight.position.set(40, 70, 40);
+      const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+      mainLight.position.set(50, 60, 20);
       mainLight.castShadow = true;
       mainLight.shadow.mapSize.width = 2048;
       mainLight.shadow.mapSize.height = 2048;
@@ -398,17 +398,13 @@
       mainLight.shadow.camera.bottom = -shadowD;
       scene.add(mainLight);
 
-      const specLight = new THREE.DirectionalLight(0xe2e8f0, 1.3);
-      specLight.position.set(-60, 50, 50);
+      const specLight = new THREE.DirectionalLight(0xf1f5f9, 1.4);
+      specLight.position.set(-60, 50, 40);
       scene.add(specLight);
 
-      const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
-      fillLight.position.set(-50, 40, -40);
+      const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
+      fillLight.position.set(-40, 30, -30);
       scene.add(fillLight);
-
-      const frontFill = new THREE.DirectionalLight(0xffffff, 0.8);
-      frontFill.position.set(0, 50, 60);
-      scene.add(frontFill);
 
       const rimLight = new THREE.PointLight(0x818cf8, 1.2, 150);
       rimLight.position.set(0, 40, -50);
@@ -419,8 +415,8 @@
         brightnessSlider.addEventListener('input', (e) => {
           const val = parseFloat(e.target.value);
           renderer.toneMappingExposure = val;
-          ambientLight.intensity = 1.4 * (val / 1.3);
-          mainLight.intensity = 1.8 * (val / 1.3);
+          ambientLight.intensity = 0.9 * (val / 1.3);
+          mainLight.intensity = 2.0 * (val / 1.3);
         });
       }
 
@@ -448,7 +444,7 @@
         textCtx.fillStyle = 'white';
         textCtx.textAlign = 'center';
         textCtx.textBaseline = 'middle';
-        textCtx.font = '900 28px "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif';
+        textCtx.font = '900 30px "Arial Black", "Impact", "PingFang TC", "Microsoft JhengHei", sans-serif';
 
         if (bottomRow.length === 0) {
           const textStr = topRow.join('');
@@ -462,7 +458,7 @@
 
         const imgData = textCtx.getImageData(0, 0, GRID_COLS, GRID_ROWS).data;
         for (let i = 0; i < GRID_COLS * GRID_ROWS; i++) {
-          textMask[i] = imgData[i * 4] > 100 ? 1 : 0;
+          textMask[i] = imgData[i * 4] > 60 ? 1 : 0;
         }
       }
 
@@ -472,9 +468,9 @@
       pinGeometry.translate(0, 0.5, 0);
 
       const pinMaterial = new THREE.MeshStandardMaterial({
-        color: 0xe2e8f0,
-        roughness: 0.10,
-        metalness: 0.96,
+        color: 0xf1f5f9,
+        roughness: 0.12,
+        metalness: 0.95,
       });
 
       const instancedMesh = new THREE.InstancedMesh(pinGeometry, pinMaterial, totalPins);
@@ -508,7 +504,7 @@
           pinPositions[idx * 2 + 1] = z;
 
           const pseudoRandom = Math.sin(c * 12.9898 + r * 78.233) * 43758.5453;
-          staggeredNoise[idx] = (pseudoRandom - Math.floor(pseudoRandom) - 0.5) * 0.10;
+          staggeredNoise[idx] = (pseudoRandom - Math.floor(pseudoRandom) - 0.5) * 0.08;
 
           currentHeights[idx] = INITIAL_HEIGHT;
           targetHeights[idx] = INITIAL_HEIGHT;
@@ -650,20 +646,20 @@
             }
           }
 
-          currentHeights[i] += (targetHeights[i] - currentHeights[i]) * 0.05;
+          currentHeights[i] += (targetHeights[i] - currentHeights[i]) * 0.06;
 
           const isText = textMask[i] === 1;
           let ripple = 0;
           
           if (!isTsunamiActive && currentLineCharCount > 8) {
             if (isText) {
-              ripple = Math.sin(timeSec * 4.5 + x * 0.6 + z * 0.6) * 0.08;
+              ripple = Math.sin(timeSec * 4.0 + x * 0.5 + z * 0.5) * 0.04;
             } else {
-              ripple = Math.cos(timeSec * 3.2 + x * 0.4 - z * 0.4) * 0.04;
+              ripple = Math.cos(timeSec * 2.8 + x * 0.3 - z * 0.3) * 0.02;
             }
           }
 
-          const finalHeight = Math.max(0.2, currentHeights[i] + ripple);
+          const finalHeight = Math.max(0.1, currentHeights[i] + ripple);
 
           dummy.position.set(x, 0, z);
           dummy.scale.set(1, finalHeight, 1);
@@ -696,7 +692,7 @@
         }
       }
 
-      // --- 自動結束與存檔錄影功能 ---
+      // --- 錄影功能 (先海嘯開場 + 自動結束存檔) ---
       let mediaRecorder = null;
       let recordedChunks = [];
       let isRecording = false;
@@ -716,7 +712,7 @@
         const recordBtn = document.getElementById('record-btn');
         if (recordBtn) {
           recordBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-          recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (全文字播放完畢自動存檔)`;
+          recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (海嘯開場 + 全文字自動存檔)`;
         }
       }
 
@@ -725,9 +721,9 @@
         if (!isRecording) {
           parseInputText();
           const totalLineCount = lines.length;
-          // 每行切換間隔 3 秒，計算完整的總展演秒數
-          const durationPerLine = 3.0;
-          const totalDurationSec = totalLineCount * durationPerLine;
+          const tsunamiDuration = 1.8; // 大海嘯過境展演時間
+          const durationPerLine = 3.0; // 每行震波展演時間
+          const totalDurationSec = tsunamiDuration + (totalLineCount > 1 ? (totalLineCount - 1) * durationPerLine : 0);
 
           const stream = renderer.domElement.captureStream(30);
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
@@ -751,19 +747,28 @@
           mediaRecorder.start();
           isRecording = true;
 
-          currentLineIdx = lines.length - 1; // 從第一行開始
-          triggerNextLineWave(0, 0);
+          // 1. 錄影啟動第一步：先觸發大海嘯進場（展示第 0 行）
+          triggerTsunami();
 
+          // 2. 海嘯過境後，若有多行文字則開啟連續震波輪播
           let stepCount = 0;
-          autoPlayTimer = setInterval(() => {
-            stepCount++;
-            if (stepCount >= totalLineCount) {
-              // 完整播完一輪，自動結束並存檔
+          if (totalLineCount > 1) {
+            setTimeout(() => {
+              autoPlayTimer = setInterval(() => {
+                stepCount++;
+                if (stepCount >= totalLineCount - 1) {
+                  stopAndSaveRecording();
+                } else {
+                  triggerNextLineWave(0, 0);
+                }
+              }, durationPerLine * 1000);
+            }, tsunamiDuration * 1000);
+          } else {
+            // 單行文字則在海嘯過境完畢後自動結束存檔
+            setTimeout(() => {
               stopAndSaveRecording();
-            } else {
-              triggerNextLineWave(0, 0);
-            }
-          }, durationPerLine * 1000);
+            }, tsunamiDuration * 1000);
+          }
 
           let remainingSec = Math.ceil(totalDurationSec);
           if (recordBtn) {
@@ -780,7 +785,7 @@
             }
           }, 1000);
 
-          showToast(`錄影開始：預計 ${totalDurationSec.toFixed(0)} 秒後自動結束存檔...`);
+          showToast(`錄影開始：大海嘯進場，預計 ${totalDurationSec.toFixed(0)} 秒後自動結束存檔...`);
         } else {
           stopAndSaveRecording();
         }
