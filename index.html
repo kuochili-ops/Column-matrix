@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>金屬細柱陣列震波文字</title>
+  <title>𓃥白六金柱陣列</title>
   <style>
     * {
       box-sizing: border-box;
@@ -258,7 +258,7 @@
     <div class="panel-header">
       <div class="panel-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-        設定選單
+        𓃥白六金柱陣列
       </div>
       <button class="toggle-btn" id="toggle-panel-btn" title="展開/收合">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="toggle-icon"><path d="M18 15l-6-6-6 6"></path></svg>
@@ -266,8 +266,8 @@
     </div>
 
     <div class="panel-content">
-      <textarea id="text-input" placeholder="輸入多行文字... (每行 > 8 字自動 2 秒輪播與搖晃，觸碰造浪)">震波金屬針陣列
-科幻動態視覺呈現
+      <textarea id="text-input" placeholder="輸入多行文字... (每行 > 8 字自動 2 秒輪播與搖晃，觸碰造浪)">𓃥白六金柱陣列
+動態視覺呈現
 歡迎體驗專屬訊息特效</textarea>
 
       <!-- 亮度調節拉桿 -->
@@ -295,9 +295,9 @@
       </button>
 
       <div class="hint">
+        • 光源左右動態擺動，呈現流動高光。<br>
         • 開始錄影先觸發大海嘯進場。<br>
-        • 隨後自動以震波輪播剩餘行數。<br>
-        • 全部播放完畢自動結束並下載影片。
+        • 隨後自動以震波輪播剩餘行數並存檔。
       </div>
     </div>
   </div>
@@ -517,7 +517,7 @@
         const inputEl = document.getElementById('text-input');
         const rawText = inputEl ? inputEl.value.trim() : '';
         if (!rawText) {
-          lines = ['細柱針陣列', '震波文字'];
+          lines = ['𓃥白六金柱陣列', '動態視覺呈現'];
         } else {
           lines = rawText.split('\n').filter(l => l.trim().length > 0);
         }
@@ -693,7 +693,7 @@
         }
       }
 
-      // --- 錄影功能 (海嘯開場 + 自動震波輪播全文字 + 自動存檔) ---
+      // --- 錄影功能 ---
       let mediaRecorder = null;
       let recordedChunks = [];
       let isRecording = false;
@@ -723,10 +723,9 @@
         if (!isRecording) {
           parseInputText();
           const totalLineCount = lines.length;
-          const tsunamiDuration = 2.5; // 大海嘯過境與展演時間
-          const waveDurationPerLine = 3.0; // 每行震波換行展演時間
+          const tsunamiDuration = 2.5;
+          const waveDurationPerLine = 3.0;
           
-          // 計算總時長：1次海嘯 + (剩餘行數 * 每行震波時間)
           const totalDurationSec = tsunamiDuration + (totalLineCount - 1) * waveDurationPerLine;
 
           const stream = renderer.domElement.captureStream(30);
@@ -751,13 +750,10 @@
           mediaRecorder.start();
           isRecording = true;
 
-          // 步驟 1: 以大海嘯進場開場（展示第 0 行）
           triggerTsunami();
 
-          // 步驟 2: 海嘯過境後，啟動震波自動輪播剩餘的行數
           if (totalLineCount > 1) {
             recordTimeoutTimer = setTimeout(() => {
-              // 播第 1 行
               triggerNextLineWave(0, 0);
 
               let lineStep = 1;
@@ -773,7 +769,6 @@
             }, tsunamiDuration * 1000);
           }
 
-          // 步驟 3: 總時長到達後自動停止錄影並存檔
           setTimeout(() => {
             stopAndSaveRecording();
           }, totalDurationSec * 1000);
@@ -880,9 +875,16 @@
         triggerTsunami();
       }, 300);
 
+      // --- 主畫布繪製與光源動態左右擺動 ---
       function animate(time) {
         requestAnimationFrame(animate);
         if (controls) controls.update();
+
+        // 🌟 光源左右動態擺動 (Math.sin 左右巡航)
+        const lightTime = time * 0.0012;
+        mainLight.position.x = Math.sin(lightTime) * 60 + 10;
+        specLight.position.x = Math.cos(lightTime * 0.8) * 60 - 10;
+
         updatePins(time);
         renderer.render(scene, camera);
       }
