@@ -291,20 +291,20 @@
 
       <button class="action-btn secondary-btn" id="record-btn" style="width: 100%;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg>
-        錄製影片 (海嘯開場 + 全文字自動存檔)
+        錄製影片 (海嘯開場 + 自動換行存檔)
       </button>
 
       <div class="hint">
-        • 開始錄影會先觸發大海嘯進場。<br>
-        • 點擊針群精確點發起漣漪擴散並換行。<br>
-        • 全流程展演完畢自動結束錄影並下載。
+        • 開始錄影先觸發大海嘯進場。<br>
+        • 隨後自動以震波輪播剩餘行數。<br>
+        • 全部播放完畢自動結束並下載影片。
       </div>
     </div>
   </div>
 
   <!-- 獨立大海嘯按鈕 -->
   <button id="tsunami-bottom-btn">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path></svg>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path></svg>
     大海嘯進場
   </button>
 
@@ -335,6 +335,7 @@
       let totalBatches = 1;
       let batchTimer = null;
       let autoPlayTimer = null;
+      let recordTimeoutTimer = null;
       let currentLineCharCount = 0;
 
       // 海嘯 state
@@ -692,7 +693,7 @@
         }
       }
 
-      // --- 錄影功能 (先海嘯開場 + 自動結束存檔) ---
+      // --- 錄影功能 (海嘯開場 + 自動震波輪播全文字 + 自動存檔) ---
       let mediaRecorder = null;
       let recordedChunks = [];
       let isRecording = false;
@@ -703,6 +704,7 @@
 
         if (autoPlayTimer) clearInterval(autoPlayTimer);
         if (recordCountdownTimer) clearInterval(recordCountdownTimer);
+        if (recordTimeoutTimer) clearTimeout(recordTimeoutTimer);
 
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
@@ -712,7 +714,7 @@
         const recordBtn = document.getElementById('record-btn');
         if (recordBtn) {
           recordBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-          recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (海嘯開場 + 全文字自動存檔)`;
+          recordBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg> 錄製影片 (海嘯開場 + 自動換行存檔)`;
         }
       }
 
@@ -721,9 +723,11 @@
         if (!isRecording) {
           parseInputText();
           const totalLineCount = lines.length;
-          const tsunamiDuration = 1.8; // 大海嘯過境展演時間
-          const durationPerLine = 3.0; // 每行震波展演時間
-          const totalDurationSec = tsunamiDuration + (totalLineCount > 1 ? (totalLineCount - 1) * durationPerLine : 0);
+          const tsunamiDuration = 2.5; // 大海嘯過境與展演時間
+          const waveDurationPerLine = 3.0; // 每行震波換行展演時間
+          
+          // 計算總時長：1次海嘯 + (剩餘行數 * 每行震波時間)
+          const totalDurationSec = tsunamiDuration + (totalLineCount - 1) * waveDurationPerLine;
 
           const stream = renderer.domElement.captureStream(30);
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
@@ -747,28 +751,32 @@
           mediaRecorder.start();
           isRecording = true;
 
-          // 1. 錄影啟動第一步：先觸發大海嘯進場（展示第 0 行）
+          // 步驟 1: 以大海嘯進場開場（展示第 0 行）
           triggerTsunami();
 
-          // 2. 海嘯過境後，若有多行文字則開啟連續震波輪播
-          let stepCount = 0;
+          // 步驟 2: 海嘯過境後，啟動震波自動輪播剩餘的行數
           if (totalLineCount > 1) {
-            setTimeout(() => {
-              autoPlayTimer = setInterval(() => {
-                stepCount++;
-                if (stepCount >= totalLineCount - 1) {
-                  stopAndSaveRecording();
-                } else {
+            recordTimeoutTimer = setTimeout(() => {
+              // 播第 1 行
+              triggerNextLineWave(0, 0);
+
+              let lineStep = 1;
+              if (lineStep < totalLineCount - 1) {
+                autoPlayTimer = setInterval(() => {
+                  lineStep++;
                   triggerNextLineWave(0, 0);
-                }
-              }, durationPerLine * 1000);
-            }, tsunamiDuration * 1000);
-          } else {
-            // 單行文字則在海嘯過境完畢後自動結束存檔
-            setTimeout(() => {
-              stopAndSaveRecording();
+                  if (lineStep >= totalLineCount - 1) {
+                    clearInterval(autoPlayTimer);
+                  }
+                }, waveDurationPerLine * 1000);
+              }
             }, tsunamiDuration * 1000);
           }
+
+          // 步驟 3: 總時長到達後自動停止錄影並存檔
+          setTimeout(() => {
+            stopAndSaveRecording();
+          }, totalDurationSec * 1000);
 
           let remainingSec = Math.ceil(totalDurationSec);
           if (recordBtn) {
@@ -785,7 +793,7 @@
             }
           }, 1000);
 
-          showToast(`錄影開始：大海嘯進場，預計 ${totalDurationSec.toFixed(0)} 秒後自動結束存檔...`);
+          showToast(`錄影開始：預計 ${Math.ceil(totalDurationSec)} 秒後自動結束存檔...`);
         } else {
           stopAndSaveRecording();
         }
